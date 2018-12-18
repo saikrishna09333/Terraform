@@ -1,0 +1,24 @@
+---
+- hosts: test
+  become: true
+  become_method: sudo
+#  vars:
+#    proxy_env:
+#      http_proxy: http://10.144.106.132:8678
+#      https_proxy: http://10.144.106.132:8678
+  tasks: 
+    - name: copying centos repo file
+      copy:
+        src: /etc/yum.repos.d/centos.repo
+        dest: /etc/yum.repos.d/centos.repo
+        owner: root
+        group: root
+        mode: 0644
+    - name: upgrade all packages
+      yum:
+         name: '*'
+         state: latest
+      environment:
+         http_proxy: http://10.144.106.132:8678
+         https_proxy: http://10.144.106.132:8678
+
