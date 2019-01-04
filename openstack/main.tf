@@ -47,13 +47,31 @@ resource "openstack_networking_subnet_v2" "Terraform_test_subnet" {
   cidr       = "172.25.60.0/24"
   ip_version = 4
 }
+resource "openstack_compute_secgroup_v2" "secgroup_test" {
+  name        = "secgroup_test"
+  description = "my security group"
+
+  rule {
+    from_port   = 22
+    to_port     = 22
+    ip_protocol = "tcp"
+    cidr        = "0.0.0.0/0"
+  }
+
+  rule {
+    from_port   = 80
+    to_port     = 80
+    ip_protocol = "tcp"
+    cidr        = "0.0.0.0/0"
+  }
+}
 
 resource "openstack_compute_instance_v2" "Terraform_test_count" {
   count           = "${var.count}"
   name            = "${var.Name_Prefix}-${format("${var.instance_name}-%02d", count.index+1)}"
   flavor_name     = "${var.Instance_Type}"
   key_pair        = "${var.Key_Pair}"
-  security_groups = ["default"]
+  security_groups = ["default" , "secgroup_test"]
   image_name      = "${var.Image}"
 
 #    provisioner "local-exec" {
@@ -79,23 +97,23 @@ resource "openstack_compute_floatingip_associate_v2" "fip_1" {
   instance_id = "${element(openstack_compute_instance_v2.Terraform_test_count.*.id, count.index+1)}"
 }
 
-resource "null_resource" "foo_provisioning" {
+#resource "null_resource" "foo_provisioning" {
 
-  provisioner "local-exec" {
-     command = <<EOD
-cat <<EOF  > hosts
-[test]
-${join("\n",openstack_compute_instance_v2.Terraform_test_count.*.access_ip_v4)}
-EOF
-EOD
+#  provisioner "local-exec" {
+#     command = <<EOD
+#cat <<EOF  > hosts
+#[test]
+#${join("\n",openstack_compute_instance_v2.Terraform_test_count.*.access_ip_v4)}
+#EOF
+#EOD
 
      
-  }
+#  }
 
-   provisioner "local-exec" {
-    command = "sleep 30 && ansible-playbook -u cloud-user --private-key ~/terraform/openstack/key.pem -i hosts playbook.yml"
-}
-}
+#   provisioner "local-exec" {
+#    command = "sleep 30 && ansible-playbook -u cloud-user --private-key ~/terraform/openstack/key.pem -i hosts playbook.yml"
+#}
+#}
 
 
 
@@ -111,4 +129,56 @@ EOD
 #    }
 
 #}
+
+
+resource "openstack_compute_instance_v2" "Terraform_test_count_round" {
+  count           = "2"
+  name            = "${var.Name_Prefix}-${format("${var.instance_name}-%02d", count.index+1)}"
+  flavor_name     = "${var.Instance_Type}"
+  key_pair        = "${var.Key_Pair}"
+  security_groups = ["default" , "secgroup_test"]
+  image_name      = "${var.Image}"
+
+#    provisioner "local-exec" {
+#      command = "sleep 30 && echo -e \"[webserver]\n${element(openstack_networking_floatingip_v2.fip_1.*.address, count.index+1)} ansible_connection=ssh ansible_ssh_user=cloud-user\" > inventory && ansible-playbook -i inventory playbook.yml"
+#    }
+
+  #  provisioner "local-exec" {
+  #   command = "sleep 30 && ansible-playbook -i hosts playbook.yml"
+  #}
+  network = {
+    name = "${var.Network_name}"
+  }
+}
+
+resource "openstack_networking_floatingip_v2" "fip_2" {
+  count = "2"
+  pool  = "ext-net-nonprod2"
+}
+
+resource "openstack_compute_floatingip_associate_v2" "fip_2" {
+  count       = "2"
+  floating_ip = "${element(openstack_networking_floatingip_v2.fip_2.*.address, count.index+1)}"
+  instance_id = "${element(openstack_compute_instance_v2.Terraform_test_count_round.*.id, count.index+1)}"
+}
+
+resource "null_resource" "foo_provisioning" {
+
+  provisioner "local-exec" {
+     command = <<EOD
+cat <<EOF  > hosts
+[test]
+${join("\n",openstack_compute_instance_v2.Terraform_test_count.*.access_ip_v4)}
+[round]
+${join("\n",openstack_compute_instance_v2.Terraform_test_count_round.*.access_ip_v4)}
+EOF
+EOD
+
+
+  }
+
+#   provisioner "local-exec" {
+#    command = "sleep 30 && ansible-playbook -u cloud-user --private-key ~/terraform/openstack/key.pem -i hosts playbook.yml"
+#}
+}
 

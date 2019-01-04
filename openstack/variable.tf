@@ -4,7 +4,7 @@ variable "openstack_password" {}
 variable "openstack_auth_url" {}
 
 variable "count" {
-  default = "3"
+  default = "4"
 }
 
 variable "Network_name" {
